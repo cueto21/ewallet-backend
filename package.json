@@ -1,0 +1,29 @@
+{
+  "name": "procesos_api_listar",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js ",
+    "test": "mocha --exit test/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/storage": "^6.4.2",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql": "^2.18.1",
+    "mysql-async-wrapper": "^2.0.1",
+    "nodemailer": "^6.7.5",
+    "nodemailer-express-handlebars": "^5.0.0",
+    "pug": "^3.0.2",
+    "utf8": "^3.0.0"
+  }
+}
