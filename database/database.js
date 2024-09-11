@@ -1,12 +1,20 @@
 const mariadb = require('mariadb');
+import dotenv from 'dotenv'
+
+dotenv.config({path:['.env']})
+
+const host = process.env.HOST
+const user = process.env.USER
+const pass = process.env.PASS
+const db = process.env.DB
 
 const pool = mariadb.createPool({
-  host: '193.203.175.136',
-  user: 'u534899669_Atento21456',
-  password: 'Atento21456',
-  database: 'u534899669_finanzas',
-  connectionLimit: 10 // Ajusta el límite de conexiones si es necesario
-});
+    host: host,
+    user: user,
+    password: password,
+    database: database,
+    connectionLimit: 10 // Ajusta el límite de conexiones si es necesario
+  });
 
 async function getConnection() {
   let conn;
