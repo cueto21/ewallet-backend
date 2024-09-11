@@ -1,93 +1,111 @@
-const mysqlConnection = require("../database/database");
+const { getConnection } = require("../database/database");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 // Crear usuario
-const crearUsuario = (req, res) => {
+const crearUsuario = async (req, res) => {
   const { nombre, email, contrasena } = req.body;
   const fechaRegistro = new Date();
 
-  // Hash the password
-  const hashedPassword = bcrypt.hashSync(contrasena, 10);
+  try {
+    // Hash the password
+    const hashedPassword = bcrypt.hashSync(contrasena, 10);
 
-  const query = `INSERT INTO usuarios (nombre, email, contrasena, fecha_registro) VALUES (?, ?, ?, ?);`;
+    const conn = await getConnection();
+    const query = `INSERT INTO usuarios (nombre, email, contrasena, fecha_registro) VALUES (?, ?, ?, ?);`;
+    await conn.query(query, [nombre, email, hashedPassword, fechaRegistro]);
 
-  mysqlConnection.query(query, [nombre, email, hashedPassword, fechaRegistro], (err, results) => {
-    if (!err) {
-      res.json({ Status: "Usuario Registrado" });
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al registrar el usuario" });
-    }
-  });
+    conn.end(); // Cerrar la conexión al terminar
+    res.json({ Status: "Usuario Registrado" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Error al registrar el usuario" });
+  }
 };
 
-const loginUsuario = (req, res) => {
+// Login usuario
+const loginUsuario = async (req, res) => {
   const { email, contrasena } = req.body;
 
-  const query = "SELECT * FROM usuarios WHERE email = ?";
+  try {
+    const conn = await getConnection();
+    const query = "SELECT * FROM usuarios WHERE email = ?";
+    const results = await conn.query(query, [email]);
 
-  mysqlConnection.query(query, [email], (err, results) => {
-    if (err) {
-      console.log(err);
-      res.status(500).json({ error: "Error en el servidor" });
-    } else if (results.length === 0) {
-      res.status(400).json({ error: "Usuario no encontrado" });
-    } else {
-      const user = results[0];
-      
-      // Check if password matches
-      if (bcrypt.compareSync(contrasena, user.contrasena)) {
-        // Create JWT token
-        const token = jwt.sign({ id: user.id_usuario }, "secretKey", { expiresIn: "1h" });
-        res.json({ token });
-      } else {
-        res.status(400).json({ error: "Contraseña incorrecta" });
-      }
+    if (results.length === 0) {
+      conn.end(); // Cerrar la conexión al terminar
+      return res.status(400).json({ error: "Usuario no encontrado" });
     }
-  });
+
+    const user = results[0];
+
+    // Check if password matches
+    if (bcrypt.compareSync(contrasena, user.contrasena)) {
+      // Create JWT token
+      const token = jwt.sign({ id: user.id_usuario }, "secretKey", { expiresIn: "1h" });
+      conn.end(); // Cerrar la conexión al terminar
+      res.json({ token });
+    } else {
+      conn.end(); // Cerrar la conexión al terminar
+      res.status(400).json({ error: "Contraseña incorrecta" });
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
 };
 
-// Crear cuenta
-const crearCuenta = (req, res) => {
-  const { idUsuario, nombreCuenta, banco, tipoCuenta, saldo, meta, red_pago, cci, numerocuenta } = req.body;
-  const fechaCreacion = new Date();
-  const query = "INSERT INTO cuentas (id_usuario, nombre_cuenta, banco, tipo_cuenta, saldo, meta, fecha_creacion, red_pago, numero_cuenta, cci) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-
-  mysqlConnection.query(query, [idUsuario, nombreCuenta, banco, tipoCuenta, saldo, meta, fechaCreacion, red_pago, numerocuenta, cci], (err, results) => {
-    if (!err) {
-      res.json({ Status: "Cuenta Creada" });
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al crear la cuenta" });
-    }
-  });
-};
-
-const getProfile = (req, res) => {
+// Obtener perfil de usuario
+const getProfile = async (req, res) => {
   const token = req.headers["authorization"];
   if (!token) {
     return res.status(401).json({ error: "No token provided" });
   }
 
-  jwt.verify(token, "secretKey", (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ error: "Token invalid" });
+  try {
+    // Verificar el token JWT
+    const decoded = jwt.verify(token, "secretKey");
+    const { id } = decoded;
+
+    const conn = await getConnection();
+    const query = "SELECT * FROM usuarios WHERE id_usuario = ?";
+    const results = await conn.query(query, [id]);
+
+    if (results.length === 0) {
+      conn.end(); // Cerrar la conexión al terminar
+      return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    const query = "SELECT * FROM usuarios WHERE id_usuario = ?";
-    mysqlConnection.query(query, [decoded.id], (err, results) => {
-      if (err) {
-        console.log(err);
-        res.status(500).json({ error: "Error al obtener el perfil" });
-      } else {
-        res.json(results[0]);
-      }
-    });
-  });
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(results[0]);
+  } catch (err) {
+    console.log(err);
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: "Token invalid" });
+    }
+    res.status(500).json({ error: "Error al obtener el perfil" });
+  }
 };
 
-const crearTarjeta = (req, res) => {
+// Crear cuenta
+const crearCuenta = async (req, res) => {
+  const { idUsuario, nombreCuenta, banco, tipoCuenta, saldo, meta, red_pago, cci, numerocuenta } = req.body;
+  const fechaCreacion = new Date();
+  const query = "INSERT INTO cuentas (id_usuario, nombre_cuenta, banco, tipo_cuenta, saldo, meta, fecha_creacion, red_pago, numero_cuenta, cci) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+
+  try {
+    const conn = await getConnection();
+    await conn.query(query, [idUsuario, nombreCuenta, banco, tipoCuenta, saldo, meta, fechaCreacion, red_pago, numerocuenta, cci]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json({ Status: "Cuenta Creada" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Error al crear la cuenta" });
+  }
+};
+
+// Crear tarjeta
+const crearTarjeta = async (req, res) => {
   const { idTarjeta, idUsuario, idcategoria, nombreTarjeta, limiteCredito, ultimo_dia_pago, red_pago, ultidigitos, saldoGastado, fecha } = req.body;
 
   const queryTarjeta = `
@@ -102,193 +120,191 @@ const crearTarjeta = (req, res) => {
     VALUES (?, ?, 'Gasto', ?, 'Consumo Inicial', ?);
   `;
 
-  mysqlConnection.beginTransaction(err => {
-    if (err) {
-      console.error('Error al iniciar la transacción:', err);
-      return res.status(500).json({ error: "Error al iniciar la transacción" });
-    }
+  const conn = await getConnection();
 
-    mysqlConnection.query(queryTarjeta, [idTarjeta, idUsuario, idcategoria, nombreTarjeta, limiteCredito, ultimo_dia_pago, red_pago, ultidigitos], (err, results) => {
-      if (err) {
-        return mysqlConnection.rollback(() => {
-          console.error('Error al crear la tarjeta:', err);
-          res.status(500).json({ error: "Error al crear la tarjeta" });
-        });
-      }
-
-      mysqlConnection.query(queryMovimiento, [idTarjeta, 71, saldoGastado, fecha], (err, results) => {
-        if (err) {
-          return mysqlConnection.rollback(() => {
-            console.error('Error al crear el movimiento:', err);
-            res.status(500).json({ error: "Error al crear el movimiento" });
-          });
-        }
-
-        mysqlConnection.commit(err => {
-          if (err) {
-            return mysqlConnection.rollback(() => {
-              console.error('Error al finalizar la transacción:', err);
-              res.status(500).json({ error: "Error al finalizar la transacción" });
-            });
-          }
-
-          res.json({ Status: "Tarjeta y movimiento creados" });
-        });
-      });
-    });
-  });
+  try {
+    await conn.beginTransaction();
+    await conn.query(queryTarjeta, [idTarjeta, idUsuario, idcategoria, nombreTarjeta, limiteCredito, ultimo_dia_pago, red_pago, ultidigitos]);
+    await conn.query(queryMovimiento, [idTarjeta, 71, saldoGastado, fecha]);
+    await conn.commit();
+    conn.end(); // Cerrar la conexión al terminar
+    res.json({ Status: "Tarjeta y movimiento creados" });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Error al crear la tarjeta o el movimiento:', err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al crear la tarjeta o el movimiento" });
+  }
 };
 
 // Crear movimiento
-const crearMovimiento = (req, res) => {
+const crearMovimiento = async (req, res) => {
   const { idCuenta, idTarjeta, idCategoria, tipoMovimiento, monto, descripcion } = req.body;
   const fechaMovimiento = new Date();
   const query = "INSERT INTO movimientos (id_cuenta, id_tarjeta, id_categoria, tipo_movimiento, monto, descripcion, fecha_movimiento) VALUES (?, ?, ?, ?, ?, ?, ?);";
 
-  mysqlConnection.query(query, [idCuenta || null, idTarjeta || null, idCategoria, tipoMovimiento, monto, descripcion, fechaMovimiento], (err, results) => {
-    if (!err) {
-      res.json({ Status: "Movimiento Creado" });
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al crear el movimiento" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    await conn.query(query, [idCuenta || null, idTarjeta || null, idCategoria, tipoMovimiento, monto, descripcion, fechaMovimiento]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json({ Status: "Movimiento Creado" });
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al crear el movimiento" });
+  }
 };
 
-
 // Crear meta
-const crearMeta = (req, res) => {
+const crearMeta = async (req, res) => {
   const { idCuenta, objetivo, fechaLimite } = req.body;
   const query = "INSERT INTO metas (id_cuenta, objetivo, fecha_limite) VALUES (?, ?, ?);";
 
-  mysqlConnection.query(query, [idCuenta, objetivo, fechaLimite], (err, results) => {
-    if (!err) {
-      res.json({ Status: "Meta Creada" });
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al crear la meta" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    await conn.query(query, [idCuenta, objetivo, fechaLimite]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json({ Status: "Meta Creada" });
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al crear la meta" });
+  }
 };
 
 // Obtener tarjetas
-const obtenerTarjetas = (req, res) => {
+const obtenerTarjetas = async (req, res) => {
   const { id_usuario } = req.body;
   if (!id_usuario) {
     return res.status(400).json({ error: "Se requiere el id_usuario" });
   }
   const query = "SELECT tarjetas.*, categoria_tarjeta.categoria FROM tarjetas JOIN categoria_tarjeta ON tarjetas.id_categoria = categoria_tarjeta.id_categoria WHERE tarjetas.id_usuario = ?";
 
-  mysqlConnection.query(query, [id_usuario], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener las tarjetas" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [id_usuario]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener las tarjetas" });
+  }
 };
 
-const obtenerTarjetaCuenta = (req, res) => {
+// Obtener tarjeta por cuenta
+const obtenerTarjetaCuenta = async (req, res) => {
   const { id_cuenta } = req.body;
   if (!id_cuenta) {
     return res.status(400).json({ error: "Se requiere el id_cuenta" });
   }
   const query = "SELECT * FROM tarjetas WHERE id_cuenta = ?";
 
-  mysqlConnection.query(query, [id_cuenta], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener la tarjeta" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [id_cuenta]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener la tarjeta" });
+  }
 };
 
-const obtenerTarjeta = (req, res) => {
+// Obtener tarjeta
+const obtenerTarjeta = async (req, res) => {
   const { id_tarjeta } = req.body;
   if (!id_tarjeta) {
     return res.status(400).json({ error: "Se requiere el id_tarjeta" });
   }
   const query = "SELECT tarjetas.*, categoria_tarjeta.categoria FROM tarjetas JOIN categoria_tarjeta ON tarjetas.id_categoria = categoria_tarjeta.id_categoria WHERE tarjetas.id_tarjeta = ?";
 
-  mysqlConnection.query(query, [id_tarjeta], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener la tarjeta" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [id_tarjeta]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener la tarjeta" });
+  }
 };
 
 // Obtener cuentas
-const obtenerCuentas = (req, res) => {
+const obtenerCuentas = async (req, res) => {
   const { id_usuario } = req.body;
   if (!id_usuario) {
     return res.status(400).json({ error: "Se requiere el id_usuario" });
   }
   const query = "SELECT * FROM cuentas WHERE id_usuario = ?";
 
-  mysqlConnection.query(query, [id_usuario], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener las cuentas" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [id_usuario]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener las cuentas" });
+  }
 };
 
-const obtenerCuenta = (req, res) => {
+// Obtener cuenta
+const obtenerCuenta = async (req, res) => {
   const { id_cuenta } = req.body;
   if (!id_cuenta) {
     return res.status(400).json({ error: "Se requiere el id_cuenta" });
   }
   const query = "SELECT * FROM cuentas WHERE id_cuenta = ?";
 
-  mysqlConnection.query(query, [id_cuenta], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener la cuenta" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [id_cuenta]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener la cuenta" });
+  }
 };
 
-
 // Obtener movimientos de cuenta
-const obtenerMovimientosCuenta = (req, res) => {
+const obtenerMovimientosCuenta = async (req, res) => {
   const { idCuenta } = req.params;
   const query = "SELECT movimientos.*, categoria_movimiento.categoria FROM movimientos JOIN categoria_movimiento ON movimientos.id_categoria = categoria_movimiento.id_categoria WHERE movimientos.id_cuenta = ?";
 
-  mysqlConnection.query(query, [idCuenta], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener los movimientos de la cuenta" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [idCuenta]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener los movimientos de la cuenta" });
+  }
 };
 
 // Obtener movimientos de tarjeta
-const obtenerMovimientosTarjeta = (req, res) => {
+const obtenerMovimientosTarjeta = async (req, res) => {
   const { idTarjeta } = req.params;
   const query = "SELECT movimientos.*, categoria_movimiento.categoria FROM movimientos JOIN categoria_movimiento ON movimientos.id_categoria = categoria_movimiento.id_categoria WHERE movimientos.id_tarjeta = ?";
 
-  mysqlConnection.query(query, [idTarjeta], (err, rows) => {
-    if (!err) {
-      res.json(rows);
-    } else {
-      console.log(err);
-      res.status(500).json({ error: "Error al obtener los movimientos de la tarjeta" });
-    }
-  });
+  try {
+    const conn = await getConnection();
+    const rows = await conn.query(query, [idTarjeta]);
+    conn.end(); // Cerrar la conexión al terminar
+    res.json(rows);
+  } catch (err) {
+    console.log(err);
+    conn.end(); // Cerrar la conexión al terminar
+    res.status(500).json({ error: "Error al obtener los movimientos de la tarjeta" });
+  }
 };
-
 
 module.exports = {
   crearUsuario,

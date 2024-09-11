@@ -1,42 +1,23 @@
-const mysql = require ('mysql');
+const mariadb = require('mariadb');
 
-
-
-/*
-const mysqlConnection = mysql.createConnection({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    socketPath: `${dbSocketPath}/${process.env.CLOUD_SQL_CONNECTION_NAME}`,
-    connectionLimit: 10
+const pool = mariadb.createPool({
+  host: '193.203.175.136',
+  user: 'u534899669_Atento21456',
+  password: 'Atento21456',
+  database: 'u534899669_finanzas',
+  connectionLimit: 10 // Ajusta el límite de conexiones si es necesario
 });
 
+async function getConnection() {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    console.log('Db is connected');
+    return conn; // Devuelve la conexión para que pueda ser utilizada en los controladores
+  } catch (err) {
+    console.error('Error connecting to the database:', err);
+    throw err; // Lanza el error para que pueda ser manejado en los controladores
+  }
+}
 
-const mysqlConnection = mysql.createConnection({
-    connectionLimit: 10,
-    host: '34.135.202.215',
-    user: 'apinfocoredb',
-    password: 'Cpa4OElxoGcitbCG',
-    database: 'apinfocoredb'
-  })
-*/
-
-const mysqlConnection = mysql.createConnection({
-    connectionLimit: 10,
-    host: 'localhost',
-    user: 'root',
-    password: 'root',
-    database: 'finanzas'
-  })
-
-
-mysqlConnection.connect(function (err){
-    if(err) {
-        console.log(err);
-        return;
-    } else {
-        console.log('Db is connected');
-    }
-});
-
-module.exports = mysqlConnection;
+module.exports = { getConnection };
