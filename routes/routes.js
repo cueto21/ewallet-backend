@@ -1,10 +1,32 @@
 const express = require("express");
 const router = express.Router();
 const cors = require("cors");
-const { crearUsuario, loginUsuario, getProfile, crearCuenta, crearTarjeta, crearMovimiento, crearMeta, obtenerTarjetas, obtenerCuentas,obtenerCuenta , obtenerMovimientosCuenta, obtenerMovimientosTarjeta, obtenerTarjeta, obtenerTarjetaCuenta } = require("../controllers/apiController");
+const { 
+  crearUsuario, 
+  loginUsuario, 
+  getProfile, 
+  crearCuenta, 
+  crearTarjeta, 
+  crearMovimiento, 
+  crearMeta, 
+  obtenerTarjetas, 
+  obtenerCuentas,
+  obtenerCuenta, 
+  obtenerMovimientosCuenta, 
+  obtenerMovimientosTarjeta, 
+  obtenerTarjeta, 
+  obtenerTarjetaCuenta 
+} = require("../controllers/apiController");
 
-// Middleware para manejar CORS
-router.use(cors());
+// Configuración de CORS
+const corsOptions = {
+  origin: 'https://www.saldopersonal.com', // Permitir solicitudes desde este dominio
+  methods: ['GET', 'POST'], // Métodos HTTP permitidos
+  allowedHeaders: ['Content-Type', 'Authorization'], // Encabezados permitidos
+};
+
+// Middleware para manejar CORS con configuración
+router.use(cors(corsOptions));
 
 // Rutas POST
 router.post("/usuario/registrar", crearUsuario);

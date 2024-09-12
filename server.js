@@ -2,7 +2,6 @@ const express = require("express");
 const app = express();
 const apiRoutes = require("./routes/routes");
 const errorHandler = require("./middlewares/errorHandler");
-import dotenv from 'dotenv'
 
 app.use(express.json());
 app.use("/api", apiRoutes);
