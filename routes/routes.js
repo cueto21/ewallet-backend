@@ -20,7 +20,7 @@ const {
 
 // Configuración de CORS
 const corsOptions = {
-  origin: 'https://www.saldopersonal.com', // Permitir solicitudes desde este dominio
+  origin: '*', // Permitir solicitudes desde este dominio
   methods: ['GET', 'POST'], // Métodos HTTP permitidos
   allowedHeaders: ['Content-Type', 'Authorization'], // Encabezados permitidos
 };
